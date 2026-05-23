@@ -63,7 +63,8 @@ def main_menu():
     return ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="Elon berish")],
-            [KeyboardButton(text="Elon narxlari"), KeyboardButton(text="Elonlarim")]
+            [KeyboardButton(text="Elon narxlari"), KeyboardButton(text="Elonlarim")],
+            [KeyboardButton(text="Adminlar")]
         ],
         resize_keyboard=True
     )
@@ -144,6 +145,7 @@ async def is_subscribed(user_id: int) -> bool:
 
 # --- ASOSIY HANDLERLAR ---
 @dp.message(CommandStart())
+@dp.message(Command("restart"))
 async def start_cmd(message: types.Message, state: FSMContext):
     await state.clear()
     if await is_subscribed(message.from_user.id):
@@ -167,6 +169,19 @@ async def check_sub_handler(call: types.CallbackQuery):
 async def back_to_main(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("Bosh sahifaga qaytdingiz.", reply_markup=main_menu())
+
+@dp.message(F.text == "Adminlar")
+async def show_admins(message: types.Message):
+    text = (
+        "<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\n"
+        "Adminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\n"
+        "Garand admin🧑‍💻:\n"
+        "👤@uzefowner\n"
+        "👤@SA1DOV707\n"
+        "👤@eF_LM10\n"
+        "👤@Makhmudov_og</blockquote>"
+    )
+    await message.answer(text)
 
 @dp.message(F.text == "Elon narxlari")
 async def elon_narxlari(message: types.Message):
@@ -197,6 +212,11 @@ async def start_sell_ad(message: types.Message, state: FSMContext):
 
 @dp.message(SellAd.image, F.photo)
 async def sell_image(message: types.Message, state: FSMContext):
+    # 2 ta rasm kelsa bloklash
+    if message.media_group_id:
+        await message.answer("❌ Iltimos, bir nechta rasm emas, faqat bitta asosiy rasmni yuboring!")
+        return
+        
     await state.update_data(photo_id=message.photo[-1].file_id)
     await message.answer("Qabul qilindi, akkountingizga Google yoki Game Center ulanganmi? ✅ ❎", reply_markup=yes_no_menu())
     await state.set_state(SellAd.gc)
@@ -221,10 +241,18 @@ async def sell_obmen(message: types.Message, state: FSMContext):
 
 @dp.message(SellAd.price)
 async def sell_price(message: types.Message, state: FSMContext):
-    if has_links(message.text):
+    text = message.text
+    if has_links(text):
         await message.answer("Ogohlantirish! Reklama taqiqlangan (@, t.me, havolalar). Iltimos, faqat narxni kiriting:")
         return
-    price_safe = html.escape(message.text)
+        
+    # Faqat raqam ekanligini tekshirish
+    is_number = text.replace(' ', '').replace('.', '').replace(',', '').isdigit()
+    if text != "Faqat obmen" and not is_number:
+        await message.answer("❌ Iltimos, narxni faqat raqamlarda kiriting (masalan: 150000) yoki pastdagi 'Faqat obmen' tugmasini bosing:")
+        return
+
+    price_safe = html.escape(text)
     await state.update_data(price=price_safe)
     await message.answer("Akkountga qo'shimcha izoh yozishingiz mumkin", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(SellAd.izoh)
@@ -292,15 +320,23 @@ async def start_buy_ad(message: types.Message, state: FSMContext):
     if not await is_subscribed(message.from_user.id):
         await message.answer("E'lon berish uchun kanalga obuna bo'ling!", reply_markup=sub_inline_menu())
         return
-    await message.answer("💵 Elon uchun budjetingizni yuboring:\n\nMasalan: 500.000", reply_markup=types.ReplyKeyboardRemove())
+    await message.answer("💵 Elon uchun budjetingizni yuboring:\n\nMasalan: 500000", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(BuyAd.budget)
 
 @dp.message(BuyAd.budget)
 async def buy_budget(message: types.Message, state: FSMContext):
-    if has_links(message.text):
+    text = message.text
+    if has_links(text):
         await message.answer("Ogohlantirish! Reklama taqiqlangan (@, t.me, havolalar).")
         return
-    budget_safe = html.escape(message.text)
+        
+    # Faqat raqam ekanligini tekshirish
+    is_number = text.replace(' ', '').replace('.', '').replace(',', '').isdigit()
+    if not is_number:
+        await message.answer("❌ Iltimos, budjetni faqat raqamlarda kiriting (masalan: 150000):")
+        return
+
+    budget_safe = html.escape(text)
     await state.update_data(budget=budget_safe)
     await message.answer("🔐 Qabul qilindi, Google yoki Game Center akkount ko'rasizmi? ✅ ❎", reply_markup=yes_no_menu())
     await state.set_state(BuyAd.gc)
@@ -495,11 +531,17 @@ async def ask_discount(call: types.CallbackQuery, state: FSMContext):
 
 @dp.message(MyAds.new_price)
 async def process_discount(message: types.Message, state: FSMContext):
-    if has_links(message.text):
+    text = message.text
+    if has_links(text):
         await message.answer("Ogohlantirish! Reklama taqiqlangan (@, t.me, havolalar).")
         return
+        
+    is_number = text.replace(' ', '').replace('.', '').replace(',', '').isdigit()
+    if not is_number:
+        await message.answer("❌ Iltimos, yangi narxni faqat raqamlarda kiriting:")
+        return
 
-    new_price = html.escape(message.text)
+    new_price = html.escape(text)
     data = await state.get_data()
     ad_id = data['ad_id']
 
