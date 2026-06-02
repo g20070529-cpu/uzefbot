@@ -44,6 +44,39 @@ def init_db():
             value TEXT
         )
     ''')
+    cur.execute('''
+        CREATE TABLE IF NOT EXISTS admins (
+            user_id INTEGER PRIMARY KEY,
+            username TEXT
+        )
+    ''')
+    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (ADMIN_ID, "owner"))
+    conn.commit()
+    conn.close()
+
+# ================= ADMINLAR =================
+def get_admins() -> list:
+    conn = sqlite3.connect("bot_database.db")
+    cur = conn.cursor()
+    cur.execute("SELECT user_id FROM admins")
+    rows = cur.fetchall()
+    conn.close()
+    return [row[0] for row in rows]
+
+def is_admin(user_id: int) -> bool:
+    return user_id in get_admins()
+
+def add_admin_db(user_id: int, username: str):
+    conn = sqlite3.connect("bot_database.db")
+    cur = conn.cursor()
+    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (user_id, username))
+    conn.commit()
+    conn.close()
+
+def remove_admin_db(username: str):
+    conn = sqlite3.connect("bot_database.db")
+    cur = conn.cursor()
+    cur.execute("DELETE FROM admins WHERE username = ? AND user_id != ?", (username.replace("@", ""), ADMIN_ID))
     conn.commit()
     conn.close()
 
@@ -166,7 +199,7 @@ class TimeoutMiddleware(BaseMiddleware):
 dp.message.middleware(TimeoutMiddleware())
 
 async def is_subscribed(user_id: int) -> bool:
-    if user_id == ADMIN_ID: return True
+    if is_admin(user_id): return True
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL, user_id=user_id)
         return member.status not in ["left", "kicked"]
@@ -199,7 +232,7 @@ async def back_to_main(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "Adminlar")
 async def show_admins(message: types.Message):
-    await message.answer("<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\nGarand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@eF_LM10\n👤@Makhmudov_og</blockquote>")
+    await message.answer("<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\nGarand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@Makhmudov_og</blockquote>")
 
 @dp.message(F.text == "Elon narxlari")
 async def elon_narxlari(message: types.Message):
@@ -213,9 +246,48 @@ async def elon_berish(message: types.Message, state: FSMContext):
     else:
         await message.answer("E'lon berish uchun avval kanalimizga obuna bo'ling!", reply_markup=sub_inline_menu())
 
+# ================= ADMIN BUYRUQLARI =================
+@dp.message(Command("addadmin"))
+async def cmd_add_admin(message: types.Message):
+    if not is_admin(message.from_user.id):
+        return await message.answer("❌ Bu buyruq faqat adminlar uchun!")
+    parts = message.text.split()
+    if len(parts) != 3:
+        return await message.answer("❌ To'g'ri format: /addadmin 123456789 @username")
+    try:
+        new_id = int(parts[1])
+        username = parts[2].replace("@", "")
+        add_admin_db(new_id, username)
+        await message.answer(f"✅ @{username} admin qilib qo'shildi!")
+    except Exception:
+        await message.answer("❌ Xatolik! Format: /addadmin 123456789 @username")
+
+@dp.message(Command("banadmin"))
+async def cmd_ban_admin(message: types.Message):
+    if message.from_user.id != ADMIN_ID:
+        return await message.answer("❌ Bu buyruq faqat bosh admin uchun!")
+    parts = message.text.split()
+    if len(parts) != 2:
+        return await message.answer("❌ To'g'ri format: /banadmin @username")
+    username = parts[1].replace("@", "")
+    remove_admin_db(username)
+    await message.answer(f"✅ @{username} adminlikdan olib tashlandi!")
+
+@dp.message(Command("banrasm"))
+async def cmd_ban_rasm(message: types.Message):
+    if not is_admin(message.from_user.id):
+        return await message.answer("❌ Bu buyruq faqat adminlar uchun!")
+    conn = sqlite3.connect("bot_database.db")
+    cur = conn.cursor()
+    cur.execute("DELETE FROM settings WHERE key = 'buy_image'")
+    conn.commit()
+    conn.close()
+    await message.answer("✅ Olish eloni rasmi o'chirildi!")
+
 # ================= ADMIN: OLISH ELONI RASMI O'RNATISH =================
-@dp.message(F.photo, F.from_user.id == ADMIN_ID)
+@dp.message(F.photo)
 async def set_buy_image(message: types.Message):
+    if not is_admin(message.from_user.id): return
     if message.caption and message.caption.lower() == "/setrasm":
         file_id = message.photo[-1].file_id
         conn = sqlite3.connect("bot_database.db")
@@ -283,12 +355,11 @@ async def sell_izoh(message: types.Message, state: FSMContext):
         f"☎️ Murojaat: <a href='tg://user?id={message.from_user.id}'>{html.escape(message.from_user.first_name)}</a>\n\n"
         f"📋 Qo'shilgan ma'lumot:\n<blockquote>{html.escape(message.text)}</blockquote>\n\n"
         f"<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\n"
-        f"Garand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@eF_LM10\n👤@Makhmudov_og</blockquote>\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
+        f"Garand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@Makhmudov_og</blockquote>\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
     )
     await state.update_data(final_text=ad_text, ad_type="sell")
 
-    if message.from_user.id == ADMIN_ID:
-        await publish_ad(message.from_user.id, "sell", data['photo_id'], ad_text, price)
+    if is_admin(message.from_user.id):
         await message.answer("Admin ekani tasdiqlandi. E'lon joylandi!", reply_markup=main_menu())
         return await state.clear()
 
@@ -329,12 +400,11 @@ async def buy_malumot(message: types.Message, state: FSMContext):
         f"{data['tag']}\n\n💴 BUDJET: {data['budget']}\n📋 Ma'lumot:\n<blockquote>{html.escape(message.text)}</blockquote>\n"
         f"☎️ Murojaat: <a href='tg://user?id={message.from_user.id}'>{html.escape(message.from_user.first_name)}</a>\n\n"
         f"<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\n"
-        f"Garand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@eF_LM10\n👤@Makhmudov_og</blockquote>\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
+        f"Garand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@Makhmudov_og</blockquote>\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
     )
     await state.update_data(final_text=ad_text, price=data['budget'], ad_type="buy", photo_id=buy_image)
 
-    if message.from_user.id == ADMIN_ID:
-        await publish_ad(message.from_user.id, "buy", buy_image, ad_text, data['budget'])
+    if is_admin(message.from_user.id):
         await message.answer("Admin ekani tasdiqlandi. E'lon joylandi!", reply_markup=main_menu())
         return await state.clear()
 
@@ -411,7 +481,7 @@ async def publish_ad(user_id, ad_type, photo_id, text_content, price) -> int:
     else:
         msg = await bot.send_message(chat_id=CHANNEL, text=text_content)
 
-    if user_id == ADMIN_ID:
+    if is_admin(user_id):
         conn = sqlite3.connect("bot_database.db")
         cur = conn.cursor()
         cur.execute("INSERT INTO ads (user_id, type, photo_id, text_content, message_id, price, status) VALUES (?, ?, ?, ?, ?, ?, 'active')",
