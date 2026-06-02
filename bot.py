@@ -15,6 +15,7 @@ from aiogram.enums import ParseMode
 TOKEN = os.getenv("TOKEN")
 CHANNEL = "@UZEF_SHOP"
 ADMIN_ID = 7252768667
+MAIN_ADMINS = [7252768667, 7494065582]
 BOT_USERNAME = "@Uzefshop_bot"
 DEFAULT_BUY_IMAGE = "AAMCAgADGQEDIqkmahJ_uvW5vHCRyHScqLndDEp_azgAAj-dAALIzJhI8jsGqtT6uNoBAAdtAAM7BA"
 
@@ -50,7 +51,8 @@ def init_db():
             username TEXT
         )
     ''')
-    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (ADMIN_ID, "owner"))
+    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (7252768667, "owner"))
+    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (7494065582, "owner2"))
     conn.commit()
     conn.close()
 
@@ -76,7 +78,8 @@ def add_admin_db(user_id: int, username: str):
 def remove_admin_db(username: str):
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
-    cur.execute("DELETE FROM admins WHERE username = ? AND user_id != ?", (username.replace("@", ""), ADMIN_ID))
+    cur.execute("DELETE FROM admins WHERE username = ? AND user_id NOT IN (?, ?)", 
+                (username.replace("@", ""), 7252768667, 7494065582))
     conn.commit()
     conn.close()
 
@@ -264,7 +267,7 @@ async def cmd_add_admin(message: types.Message):
 
 @dp.message(Command("banadmin"))
 async def cmd_ban_admin(message: types.Message):
-    if message.from_user.id != ADMIN_ID:
+    if message.from_user.id not in MAIN_ADMINS:
         return await message.answer("❌ Bu buyruq faqat bosh admin uchun!")
     parts = message.text.split()
     if len(parts) != 2:
@@ -285,7 +288,7 @@ async def cmd_ban_rasm(message: types.Message):
     await message.answer("✅ Olish eloni rasmi o'chirildi!")
 
 # ================= ADMIN: OLISH ELONI RASMI O'RNATISH =================
-@dp.message(F.photo)
+@dp.message(F.photo, StateFilter(None))
 async def set_buy_image(message: types.Message):
     if not is_admin(message.from_user.id): return
     if message.caption and message.caption.lower() == "/setrasm":
