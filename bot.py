@@ -26,60 +26,55 @@ dp = Dispatcher()
 def init_db():
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS ads (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER,
-            type TEXT,
-            photo_id TEXT,
-            text_content TEXT,
-            message_id INTEGER,
-            price TEXT,
-            discount_count INTEGER DEFAULT 0,
-            status TEXT DEFAULT 'pending'
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS settings (
-            key TEXT PRIMARY KEY,
-            value TEXT
-        )
-    ''')
-    cur.execute('''
-        CREATE TABLE IF NOT EXISTS admins (
-            user_id INTEGER PRIMARY KEY,
-            username TEXT
-        )
-    ''')
-    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (7252768667, "owner"))
-    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (7494065582, "owner2"))
+    cur.execute('''CREATE TABLE IF NOT EXISTS ads (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER, type TEXT, photo_id TEXT,
+        text_content TEXT, message_id INTEGER, price TEXT,
+        discount_count INTEGER DEFAULT 0, status TEXT DEFAULT 'pending'
+    )''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY, value TEXT
+    )''')
+    cur.execute('''CREATE TABLE IF NOT EXISTS garant_admins (
+        username TEXT PRIMARY KEY
+    )''')
+    # Boshlang'ich garant adminlar
+    for u in ["uzefowner", "SA1DOV707", "Makhmudov_og"]:
+        cur.execute("INSERT OR IGNORE INTO garant_admins (username) VALUES (?)", (u,))
     conn.commit()
     conn.close()
 
-# ================= ADMINLAR =================
-def get_admins() -> list:
+# ================= GARANT ADMINLAR =================
+def get_garant_admins():
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
-    cur.execute("SELECT user_id FROM admins")
+    cur.execute("SELECT username FROM garant_admins ORDER BY rowid")
     rows = cur.fetchall()
     conn.close()
     return [row[0] for row in rows]
 
-def is_admin(user_id: int) -> bool:
-    return user_id in get_admins()
+def get_garant_text():
+    admins = get_garant_admins()
+    admin_list = "\n".join([f"👤@{u}" for u in admins])
+    return (
+        f"<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\n"
+        f"Adminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\n"
+        f"Garand admin🧑‍💻:\n{admin_list}</blockquote>"
+    )
 
-def add_admin_db(user_id: int, username: str):
+def add_garant_admin(username: str):
+    username = username.replace("@", "").strip()
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
-    cur.execute("INSERT OR IGNORE INTO admins (user_id, username) VALUES (?, ?)", (user_id, username))
+    cur.execute("INSERT OR IGNORE INTO garant_admins (username) VALUES (?)", (username,))
     conn.commit()
     conn.close()
 
-def remove_admin_db(username: str):
+def remove_garant_admin(username: str):
+    username = username.replace("@", "").strip()
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
-    cur.execute("DELETE FROM admins WHERE username = ? AND user_id NOT IN (?, ?)", 
-                (username.replace("@", ""), 7252768667, 7494065582))
+    cur.execute("DELETE FROM garant_admins WHERE username = ?", (username,))
     conn.commit()
     conn.close()
 
@@ -92,7 +87,7 @@ def get_buy_image():
     conn.close()
     return row[0] if row else DEFAULT_BUY_IMAGE
 
-# ================= HOLATLAR (FSM) =================
+# ================= HOLATLAR =================
 class SellAd(StatesGroup):
     image, gc, obmen, price, izoh, receipt = State(), State(), State(), State(), State(), State()
 
@@ -104,65 +99,49 @@ class MyAds(StatesGroup):
 
 # ================= KLAVIATURALAR =================
 def main_menu():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Elon berish")],
-            [KeyboardButton(text="Elon narxlari"), KeyboardButton(text="Elonlarim")],
-            [KeyboardButton(text="Adminlar")]
-        ], resize_keyboard=True
-    )
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="Elon berish")],
+        [KeyboardButton(text="Elon narxlari"), KeyboardButton(text="Elonlarim")],
+        [KeyboardButton(text="Adminlar")]
+    ], resize_keyboard=True)
 
 def ad_types_menu():
-    return ReplyKeyboardMarkup(
-        keyboard=[
-            [KeyboardButton(text="Sotish eloni"), KeyboardButton(text="Olish eloni")],
-            [KeyboardButton(text="⬅️ Ortga")]
-        ], resize_keyboard=True
-    )
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text="Sotish eloni"), KeyboardButton(text="Olish eloni")],
+        [KeyboardButton(text="⬅️ Ortga")]
+    ], resize_keyboard=True)
 
 def yes_no_menu():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="✅"), KeyboardButton(text="❎")]], resize_keyboard=True
-    )
+    return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="✅"), KeyboardButton(text="❎")]], resize_keyboard=True)
 
 def only_exchange_menu():
-    return ReplyKeyboardMarkup(
-        keyboard=[[KeyboardButton(text="Faqat obmen")]], resize_keyboard=True
-    )
+    return ReplyKeyboardMarkup(keyboard=[[KeyboardButton(text="Faqat obmen")]], resize_keyboard=True)
 
 def payment_inline_btn():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(text="To'lov qildim ✅", callback_data="paid_receipt")]]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="To'lov qildim ✅", callback_data="paid_receipt")]])
 
 def admin_approve_menu(ad_id):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_{ad_id}"),
-             InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_{ad_id}")]
-        ]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text="✅ Tasdiqlash", callback_data=f"approve_{ad_id}"),
+        InlineKeyboardButton(text="❌ Rad etish", callback_data=f"reject_{ad_id}")
+    ]])
 
 def my_ads_menu(ad_id):
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="💸 Narxni tushirish", callback_data=f"discount_{ad_id}")],
-            [InlineKeyboardButton(text="🤝 Sotildi", callback_data=f"sold_{ad_id}")]
-        ]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="💸 Narxni tushirish", callback_data=f"discount_{ad_id}")],
+        [InlineKeyboardButton(text="🤝 Sotildi", callback_data=f"sold_{ad_id}")]
+    ])
 
 def sub_inline_menu():
-    return InlineKeyboardMarkup(
-        inline_keyboard=[
-            [InlineKeyboardButton(text="📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL.replace('@', '')}")],
-            [InlineKeyboardButton(text="✅ Obunani tekshirish", callback_data="check_sub")]
-        ]
-    )
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="📢 Kanalga obuna bo'lish", url=f"https://t.me/{CHANNEL.replace('@', '')}")],
+        [InlineKeyboardButton(text="✅ Obunani tekshirish", callback_data="check_sub")]
+    ])
 
 def has_links(text: str) -> bool:
     return bool(text and re.search(r'(@|t\.me|http|www)', text, re.IGNORECASE))
 
-# ================= 5 DAQIQALIK KUTISH (TIMEOUT) MIDDLEWARE =================
+# ================= TIMEOUT MIDDLEWARE =================
 user_tasks = {}
 
 async def cancel_state_after_timeout(user_id, state, bot_instance):
@@ -184,25 +163,21 @@ class TimeoutMiddleware(BaseMiddleware):
         user_id = event.from_user.id
         state: FSMContext = data.get("state")
         bot_instance: Bot = data.get("bot")
-
         if user_id in user_tasks:
             user_tasks[user_id].cancel()
-
         result = await handler(event, data)
         current_state = await state.get_state()
-
         if current_state is not None:
             task = asyncio.create_task(cancel_state_after_timeout(user_id, state, bot_instance))
             user_tasks[user_id] = task
         elif user_id in user_tasks:
             del user_tasks[user_id]
-
         return result
 
 dp.message.middleware(TimeoutMiddleware())
 
 async def is_subscribed(user_id: int) -> bool:
-    if is_admin(user_id): return True
+    if user_id in MAIN_ADMINS: return True
     try:
         member = await bot.get_chat_member(chat_id=CHANNEL, user_id=user_id)
         return member.status not in ["left", "kicked"]
@@ -235,7 +210,7 @@ async def back_to_main(message: types.Message, state: FSMContext):
 
 @dp.message(F.text == "Adminlar")
 async def show_admins(message: types.Message):
-    await message.answer("<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\nGarand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@Makhmudov_og</blockquote>")
+    await message.answer(get_garant_text())
 
 @dp.message(F.text == "Elon narxlari")
 async def elon_narxlari(message: types.Message):
@@ -252,34 +227,30 @@ async def elon_berish(message: types.Message, state: FSMContext):
 # ================= ADMIN BUYRUQLARI =================
 @dp.message(Command("addadmin"))
 async def cmd_add_admin(message: types.Message):
-    if not is_admin(message.from_user.id):
-        return await message.answer("❌ Bu buyruq faqat adminlar uchun!")
+    if message.from_user.id not in MAIN_ADMINS:
+        return await message.answer("❌ Bu buyruq faqat bosh adminlar uchun!")
     parts = message.text.split()
-    if len(parts) != 3:
-        return await message.answer("❌ To'g'ri format: /addadmin 123456789 @username")
-    try:
-        new_id = int(parts[1])
-        username = parts[2].replace("@", "")
-        add_admin_db(new_id, username)
-        await message.answer(f"✅ @{username} admin qilib qo'shildi!")
-    except Exception:
-        await message.answer("❌ Xatolik! Format: /addadmin 123456789 @username")
+    if len(parts) != 2:
+        return await message.answer("❌ To'g'ri format:\n/addadmin @username")
+    username = parts[1].replace("@", "")
+    add_garant_admin(username)
+    await message.answer(f"✅ @{username} garant admin ro'yxatiga qo'shildi!")
 
 @dp.message(Command("banadmin"))
 async def cmd_ban_admin(message: types.Message):
     if message.from_user.id not in MAIN_ADMINS:
-        return await message.answer("❌ Bu buyruq faqat bosh admin uchun!")
+        return await message.answer("❌ Bu buyruq faqat bosh adminlar uchun!")
     parts = message.text.split()
     if len(parts) != 2:
-        return await message.answer("❌ To'g'ri format: /banadmin @username")
+        return await message.answer("❌ To'g'ri format:\n/banadmin @username")
     username = parts[1].replace("@", "")
-    remove_admin_db(username)
-    await message.answer(f"✅ @{username} adminlikdan olib tashlandi!")
+    remove_garant_admin(username)
+    await message.answer(f"✅ @{username} garant admin ro'yxatidan olib tashlandi!")
 
 @dp.message(Command("banrasm"))
 async def cmd_ban_rasm(message: types.Message):
-    if not is_admin(message.from_user.id):
-        return await message.answer("❌ Bu buyruq faqat adminlar uchun!")
+    if message.from_user.id not in MAIN_ADMINS:
+        return await message.answer("❌ Bu buyruq faqat bosh adminlar uchun!")
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("DELETE FROM settings WHERE key = 'buy_image'")
@@ -287,10 +258,10 @@ async def cmd_ban_rasm(message: types.Message):
     conn.close()
     await message.answer("✅ Olish eloni rasmi o'chirildi!")
 
-# ================= ADMIN: OLISH ELONI RASMI O'RNATISH =================
+# ================= RASM QOYISH (faqat state yo'q vaqtda) =================
 @dp.message(F.photo, StateFilter(None))
 async def set_buy_image(message: types.Message):
-    if not is_admin(message.from_user.id): return
+    if message.from_user.id not in MAIN_ADMINS: return
     if message.caption and message.caption.lower() == "/setrasm":
         file_id = message.photo[-1].file_id
         conn = sqlite3.connect("bot_database.db")
@@ -300,7 +271,7 @@ async def set_buy_image(message: types.Message):
         conn.close()
         await message.answer("✅ Olish eloni rasmi muvaffaqiyatli saqlandi!")
 
-# ================= SOTISH ELONI BOSQICHLARI =================
+# ================= SOTISH ELONI =================
 @dp.message(F.text == "Sotish eloni")
 async def start_sell_ad(message: types.Message, state: FSMContext):
     if not await is_subscribed(message.from_user.id): return
@@ -338,7 +309,6 @@ async def sell_price(message: types.Message, state: FSMContext):
     if has_links(text): return await message.answer("Ogohlantirish! Reklama taqiqlangan.")
     if text != "Faqat obmen" and not text.replace(' ', '').isdigit():
         return await message.answer("❌ Iltimos, narxni faqat raqamlarda kiriting:")
-
     await state.update_data(price=html.escape(text))
     await message.answer("Akkountga qo'shimcha izoh yozishingiz mumkin", reply_markup=types.ReplyKeyboardRemove())
     await state.set_state(SellAd.izoh)
@@ -347,30 +317,26 @@ async def sell_price(message: types.Message, state: FSMContext):
 async def sell_izoh(message: types.Message, state: FSMContext):
     if not message.text or message.text.isdigit() or has_links(message.text):
         return await message.answer("❌ Iltimos, izohni to'g'ri yozing!")
-
     data = await state.get_data()
     price = data['price']
     tags = "#SOTILMAYDI #FAQAT_OBMEN" if price.lower() == "faqat obmen" else "#SOTILADI"
     narx_text = "#OBMEN_UCHUN" if price.lower() == "faqat obmen" else f"{price}"
-
     ad_text = (
         f"{tags}\n\n💴 Narx: {narx_text}\n♻️ Obmen ko'rish: {data['obmen']}\n⚠️ Google & Game Center: {data['gc']}\n"
         f"☎️ Murojaat: <a href='tg://user?id={message.from_user.id}'>{html.escape(message.from_user.first_name)}</a>\n\n"
         f"📋 Qo'shilgan ma'lumot:\n<blockquote>{html.escape(message.text)}</blockquote>\n\n"
-        f"<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\n"
-        f"Garand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@Makhmudov_og</blockquote>\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
+        f"{get_garant_text()}\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
     )
     await state.update_data(final_text=ad_text, ad_type="sell")
-
-    if is_admin(message.from_user.id):
+    if message.from_user.id in MAIN_ADMINS:
+        await publish_ad(message.from_user.id, "sell", data['photo_id'], ad_text, price)
         await message.answer("Admin ekani tasdiqlandi. E'lon joylandi!", reply_markup=main_menu())
         return await state.clear()
-
     await message.answer_photo(photo=data['photo_id'], caption=ad_text)
     await message.answer("✅ E'lon yuborishga tayyor!\n\n💰 Xizmat narxi: 2 000 so'm\nAdmin karta raqami ;\n9860166654505204\nSunnatov Shukurullo\n\n⏳ 5 daqiqa ichida to'lov qiling.", reply_markup=payment_inline_btn())
     await state.set_state(SellAd.receipt)
 
-# ================= OLISH ELONI BOSQICHLARI =================
+# ================= OLISH ELONI =================
 @dp.message(F.text == "Olish eloni")
 async def start_buy_ad(message: types.Message, state: FSMContext):
     if not await is_subscribed(message.from_user.id): return
@@ -395,27 +361,23 @@ async def buy_gc(message: types.Message, state: FSMContext):
 async def buy_malumot(message: types.Message, state: FSMContext):
     if not message.text or message.text.isdigit() or has_links(message.text):
         return await message.answer("❌ Iltimos, ma'lumotni to'g'ri yozing!")
-
     data = await state.get_data()
-    buy_image = get_buy_image()  # ← admin qo'ygan rasm
-
+    buy_image = get_buy_image()
     ad_text = (
         f"{data['tag']}\n\n💴 BUDJET: {data['budget']}\n📋 Ma'lumot:\n<blockquote>{html.escape(message.text)}</blockquote>\n"
         f"☎️ Murojaat: <a href='tg://user?id={message.from_user.id}'>{html.escape(message.from_user.first_name)}</a>\n\n"
-        f"<blockquote>♻️OLDI SOTDI GARANT ADMINLAR\nAdminsiz savdo 99% aldov bilan tugaydi garand adminsiz savdo qilmang ‼️\n\n"
-        f"Garand admin🧑‍💻:\n👤@uzefowner\n👤@SA1DOV707\n👤@Makhmudov_og</blockquote>\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
+        f"{get_garant_text()}\n\nReklama berish uchun 📣:\n{BOT_USERNAME} ⚜️"
     )
     await state.update_data(final_text=ad_text, price=data['budget'], ad_type="buy", photo_id=buy_image)
-
-    if is_admin(message.from_user.id):
+    if message.from_user.id in MAIN_ADMINS:
+        await publish_ad(message.from_user.id, "buy", buy_image, ad_text, data['budget'])
         await message.answer("Admin ekani tasdiqlandi. E'lon joylandi!", reply_markup=main_menu())
         return await state.clear()
-
     await message.answer_photo(photo=buy_image, caption=ad_text)
     await message.answer("✅ E'lon yuborishga tayyor!\n\n💰 Xizmat narxi: 2 000 so'm\nAdmin karta raqami ;\n9860166654505204\nSunnatov Shukurullo\n\n⏳ 5 daqiqa ichida to'lov qiling.", reply_markup=payment_inline_btn())
     await state.set_state(BuyAd.receipt)
 
-# ================= TO'LOV VA ADMIN TASDIQLASHI =================
+# ================= TO'LOV =================
 @dp.callback_query(F.data == "paid_receipt", StateFilter(SellAd.receipt, BuyAd.receipt))
 async def ask_receipt(call: types.CallbackQuery):
     await call.message.answer("To'lov chekini rasm ko'rinishida yuboring:")
@@ -424,7 +386,6 @@ async def ask_receipt(call: types.CallbackQuery):
 @dp.message(StateFilter(SellAd.receipt, BuyAd.receipt), F.photo)
 async def receive_receipt(message: types.Message, state: FSMContext):
     data = await state.get_data()
-
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("INSERT INTO ads (user_id, type, photo_id, text_content, price, status) VALUES (?, ?, ?, ?, ?, 'pending')",
@@ -432,7 +393,6 @@ async def receive_receipt(message: types.Message, state: FSMContext):
     ad_id = cur.lastrowid
     conn.commit()
     conn.close()
-
     admin_text = f"Yangi to'lov cheki!\nUser ID: {message.from_user.id}\nUsername: @{message.from_user.username}\nE'lon turi: {data.get('ad_type', 'sell')}"
     await bot.send_photo(chat_id=ADMIN_ID, photo=message.photo[-1].file_id, caption=admin_text, reply_markup=admin_approve_menu(ad_id))
     await message.answer("Chek adminga yuborildi. Tasdiqlangach e'lon kanalga joylanadi.", reply_markup=main_menu())
@@ -445,12 +405,10 @@ async def invalid_receipt(message: types.Message):
 @dp.callback_query(F.data.startswith("approve_"))
 async def admin_approve(call: types.CallbackQuery):
     ad_id = int(call.data.split("_")[1])
-
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("SELECT user_id, type, photo_id, text_content, price FROM ads WHERE id = ?", (ad_id,))
     ad_data = cur.fetchone()
-
     if ad_data:
         msg_id = await publish_ad(ad_data[0], ad_data[1], ad_data[2], ad_data[3], ad_data[4])
         cur.execute("UPDATE ads SET status = 'active', message_id = ? WHERE id = ?", (msg_id, ad_id))
@@ -464,7 +422,6 @@ async def admin_approve(call: types.CallbackQuery):
 @dp.callback_query(F.data.startswith("reject_"))
 async def admin_reject(call: types.CallbackQuery):
     ad_id = int(call.data.split("_")[1])
-
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("SELECT user_id FROM ads WHERE id = ?", (ad_id,))
@@ -483,8 +440,7 @@ async def publish_ad(user_id, ad_type, photo_id, text_content, price) -> int:
         msg = await bot.send_photo(chat_id=CHANNEL, photo=photo_id, caption=text_content)
     else:
         msg = await bot.send_message(chat_id=CHANNEL, text=text_content)
-
-    if is_admin(user_id):
+    if user_id in MAIN_ADMINS:
         conn = sqlite3.connect("bot_database.db")
         cur = conn.cursor()
         cur.execute("INSERT INTO ads (user_id, type, photo_id, text_content, message_id, price, status) VALUES (?, ?, ?, ?, ?, ?, 'active')",
@@ -501,7 +457,6 @@ async def my_ads(message: types.Message):
     cur.execute("SELECT id, message_id, price FROM ads WHERE user_id = ? AND status = 'active'", (message.from_user.id,))
     active_ads = cur.fetchall()
     conn.close()
-
     if not active_ads:
         return await message.answer("Sizda faol e'lonlar mavjud emas.")
     for ad_id, msg_id, price in active_ads:
@@ -510,13 +465,11 @@ async def my_ads(message: types.Message):
 @dp.callback_query(F.data.startswith("discount_"))
 async def ask_discount(call: types.CallbackQuery, state: FSMContext):
     ad_id = int(call.data.split("_")[1])
-
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("SELECT discount_count FROM ads WHERE id = ?", (ad_id,))
     res = cur.fetchone()
     conn.close()
-
     if res and res[0] >= 2:
         return await call.answer("Narxni maksimal 2 marta tushirgansiz!", show_alert=True)
     await state.update_data(ad_id=ad_id)
@@ -530,12 +483,10 @@ async def process_discount(message: types.Message, state: FSMContext):
     new_price = html.escape(message.text)
     data = await state.get_data()
     ad_id = data['ad_id']
-
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("SELECT message_id, price FROM ads WHERE id = ?", (ad_id,))
     ad_data = cur.fetchone()
-
     if ad_data:
         try:
             await bot.send_message(chat_id=CHANNEL, text=f"#FAST Yangi narxi: <s>{ad_data[1]}</s>  {new_price}", reply_to_message_id=ad_data[0])
@@ -550,12 +501,10 @@ async def process_discount(message: types.Message, state: FSMContext):
 @dp.callback_query(F.data.startswith("sold_"))
 async def mark_sold(call: types.CallbackQuery):
     ad_id = int(call.data.split("_")[1])
-
     conn = sqlite3.connect("bot_database.db")
     cur = conn.cursor()
     cur.execute("SELECT message_id FROM ads WHERE id = ?", (ad_id,))
     ad_data = cur.fetchone()
-
     if ad_data:
         try:
             await bot.send_message(chat_id=CHANNEL, text="#SOTILDI", reply_to_message_id=ad_data[0])
@@ -566,7 +515,7 @@ async def mark_sold(call: types.CallbackQuery):
             await call.answer(f"Xatolik: {e}", show_alert=True)
     conn.close()
 
-# ================= ASOSIY YURGIZISH QISMI =================
+# ================= MAIN =================
 async def main():
     init_db()
     await bot.delete_webhook(drop_pending_updates=True)
