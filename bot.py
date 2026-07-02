@@ -333,7 +333,7 @@ async def sell_izoh(message: types.Message, state: FSMContext):
         await message.answer("Admin ekani tasdiqlandi. E'lon joylandi!", reply_markup=main_menu())
         return await state.clear()
     await message.answer_photo(photo=data['photo_id'], caption=ad_text)
-    await message.answer("✅ E'lon yuborishga tayyor!\n\n💰 Xizmat narxi: 2 000 so'm\nAdmin karta raqami ;\n9860166654505204\nSunnatov Shukurullo\n\n⏳ 5 daqiqa ichida to'lov qiling.", reply_markup=payment_inline_btn())
+    await message.answer("✅ E'lon yuborishga tayyor!\n\n💰 Xizmat narxi: 1 000 so'm\nAdmin karta raqami ;\n9860166654505204\nSunnatov Shukurullo\n\n⏳ 5 daqiqa ichida to'lov qiling.", reply_markup=payment_inline_btn())
     await state.set_state(SellAd.receipt)
 
 # ================= OLISH ELONI =================
@@ -374,7 +374,7 @@ async def buy_malumot(message: types.Message, state: FSMContext):
         await message.answer("Admin ekani tasdiqlandi. E'lon joylandi!", reply_markup=main_menu())
         return await state.clear()
     await message.answer_photo(photo=buy_image, caption=ad_text)
-    await message.answer("✅ E'lon yuborishga tayyor!\n\n💰 Xizmat narxi: 2 000 so'm\nAdmin karta raqami ;\n9860166654505204\nSunnatov Shukurullo\n\n⏳ 5 daqiqa ichida to'lov qiling.", reply_markup=payment_inline_btn())
+    await message.answer("✅ E'lon yuborishga tayyor!\n\n💰 Xizmat narxi: 1 000 so'm\nAdmin karta raqami ;\n9860166654505204\nSunnatov Shukurullo\n\n⏳ 5 daqiqa ichida to'lov qiling.", reply_markup=payment_inline_btn())
     await state.set_state(BuyAd.receipt)
 
 # ================= TO'LOV =================
