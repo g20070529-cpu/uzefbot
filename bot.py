@@ -14,7 +14,7 @@ from aiogram.enums import ParseMode
 # ================= SOZLAMALAR =================
 TOKEN = os.getenv("TOKEN")
 CHANNEL = "@UZEF_SHOP"
-ADMIN_ID = 7252768667
+ADMIN_ID = [7252768667, 7494065582]
 MAIN_ADMINS = [7252768667, 7494065582]
 BOT_USERNAME = "@Uzefshop_bot"
 DEFAULT_BUY_IMAGE = "AAMCAgADGQEDIqkmahJ_uvW5vHCRyHScqLndDEp_azgAAj-dAALIzJhI8jsGqtT6uNoBAAdtAAM7BA"
@@ -214,7 +214,7 @@ async def show_admins(message: types.Message):
 
 @dp.message(F.text == "Elon narxlari")
 async def elon_narxlari(message: types.Message):
-    await message.answer("🛍Akkauntlarga e'lon berish narxlari:\nHar qanaqa akkaunt narxi 2000 so'm\n\n❗️Akkount olaman deb reklama berishingiz ham mumkin!")
+    await message.answer("🛍Akkauntlarga e'lon berish narxlari:\nHar qanaqa akkaunt narxi 1000 so'm\n\n❗️Akkount olaman deb reklama berishingiz ham mumkin!")
 
 @dp.message(F.text == "Elon berish")
 async def elon_berish(message: types.Message, state: FSMContext):
